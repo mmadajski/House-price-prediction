@@ -1,3 +1,8 @@
+library(lmtest)
+library(ltm)
+library(dplyr)
+library(Rcpp)
+
 # Loading data
 data = read.table("Housing.csv", header = TRUE, sep = ",")
 View(data)
@@ -17,15 +22,14 @@ for (name in levels(furnish_factor)) {
 }
 data = data[,names(data) != "furnishingstatus"]
 
+# Exploring data.
+summary(data)
 continuous_variables = c("price", "area", "bedrooms", "bathrooms", "stories", "parking")
 for (column in continuous_variables) {
   hist(data[,column], main = paste("Histogram of:", column), xlab = column)
 }
 
 # Checking corelations.
-install.packages("ltm")
-library(ltm)
-
 # Point biserial correlations.
 binary_variables = names(data)[!names(data) %in% continuous_variables]
 for (bin_var in binary_variables) {
@@ -35,8 +39,8 @@ for (bin_var in binary_variables) {
     print("--------------")
 }
 
-# Corelations between is weak. Highest correlation equals to 0.452,
-# on average correlation are around 0.3.
+# Correlations between variables are weak. Highest correlation equals to 0.452,
+# on average correlations are around 0.3.
 
 correlatinos <- round(cor(data[,continuous_variables]),2)
 library(reshape2)
@@ -49,9 +53,9 @@ ggplot(data = cors_melt, aes(x=Var1, y=Var2, fill=value)) +
 
 # Correlations between continuous variables and price are quite weak at around 0.3-0.5.
 
-library(dplyr)
-install.packages('Rcpp')
-library(Rcpp)
+
+# Split data into train and test sets.
+set.seed(123)
 train_index = sample(c(1:length(data[,"price"])), length(data[,"price"]) * 0.7)
 test_index = setdiff(c(1:length(data[,"price"])), train_index)
 
@@ -63,18 +67,20 @@ data_test = data[test_index,]
 price_test = data_test$price
 data_test$price = NULL
 
+# Standarization 
 for (column in continuous_variables[continuous_variables != "price"]) {
-  mini = min(data_train[,column])
-  maxi = max(data_train[,column])
+  mean = mean(data_train[,column])
+  std = sd(data_train[,column])
   
-  data_train[,column] = (data_train[,column] - mini) / (maxi - mini)
-  data_test[,column] = (data_test[,column] - mini) / (maxi - mini)
+  data_train[,column] = (data_train[,column] - mean) / std
+  data_test[,column] = (data_test[,column] - mean) / std
 }
-View(data_train)
 
-model = lm(formula = price_train~., data=data_train)
+# Fitting model
+price.log <- log1p(price_train)
+model = lm(formula = price.log~., data=data_train)
 summary(model)
-model$coefficients
+plot(model)
 
 # Making predictions and calculating metrics.
 calculate_rmse = function(predictions, true_anwsers) {
@@ -85,27 +91,52 @@ calculate_rmse = function(predictions, true_anwsers) {
 predictions_train = predict(model, data_train)
 predictions_test = predict(model, data_test)
 
-print(paste("Rmse train:", calculate_rmse(predictions_train, price_train)))
-print(paste("Rmse test:", calculate_rmse(predictions_test, price_test)))
+print(paste("Rmse train:", calculate_rmse(predictions_train, log1p(price_train))))
+print(paste("Rmse test:", calculate_rmse(predictions_test, log1p(price_test))))
+
+residuals <- price.log - predictions_train
+hist(residuals)
+shapiro.test(residuals)
+qqnorm(residuals)
+qqline(c(2,2))
+qqline(residuals, col = "red", lwd = 2)
+
+dwtest(model)
+bptest(model)
 
 # As warning "prediction from a rank-deficient fit may be misleading" suggest,
 # since furnishingstatus_unfurnished variable doesn't contribute in any way to model, 
-# so this variable will be dropped.
+# so this variable will be dropped. Bedrooms variable will be dropped as well because
+# it isn't statistically important in model.
 
 data_train$furnishingstatus_unfurnished = NULL
 data_test$furnishingstatus_unfurnished = NULL
+data_train$bedrooms = NULL
+data_test$bedrooms = NULL
 
-model = lm(formula = price_train~., data=data_train)
+model = lm(formula = price.log~., data=data_train)
+summary(model) 
 
 predictions_train = predict(model, data_train)
 predictions_test = predict(model, data_test)
 
-print(paste("Rmse train:", calculate_rmse(predictions_train, price_train)))
-print(paste("Rmse test:", calculate_rmse(predictions_test, price_test)))
+print(paste("Rmse train:", calculate_rmse(predictions_train, price.log)))
+print(paste("Rmse test:", calculate_rmse(predictions_test, log1p(price_test))))
 
-summary(model)
+residuals <- price.log - predictions_train
+hist(residuals)
+shapiro.test(residuals)
+qqnorm(residuals)
+qqline(residuals, col = "red", lwd = 2)
 
-# In this case R-squared equals 0.6637 which means that relation between 
-# price and training variables explains 66.37% of variation in data.
-# R-square is to small to build good model.
-# High values of rsme in train and test data (1083651 and 992861 respectively) confirms that. 
+plot(model)
+dwtest(model)
+bptest(model)
+
+# In this case R-squared equals 0.7038 which means that relation between 
+# price and variables explains 70.38% of variation in price.
+
+# Shapiro-Wilk test p-value equals 0.05117 implying that residuals distribution
+# is not significantly different from normal distribution.
+
+# 

@@ -68,6 +68,7 @@ for (column in continuous_variables[continuous_variables != "price"]) {
 # Fitting model
 price.log <- log1p(price_train)
 model = lm(formula = price.log~., data=data_train)
+
 summary(model)
 plot(model)
 
@@ -86,8 +87,8 @@ print(paste("Rmse test:", calculate_rmse(predictions_test, log1p(price_test))))
 residuals <- price.log - predictions_train
 hist(residuals)
 shapiro.test(residuals)
+
 qqnorm(residuals)
-qqline(c(2,2))
 qqline(residuals, col = "red", lwd = 2)
 
 dwtest(model)

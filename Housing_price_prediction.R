@@ -2,9 +2,14 @@ library(lmtest)
 library(ltm)
 library(dplyr)
 library(Rcpp)
+library(reshape2)
+library(ggplot2)
+
 
 # Loading data
 data = read.table("Housing.csv", header = TRUE, sep = ",")
+dim(data)
+names(data)
 View(data)
 length(which(is.na(data))) # Check for missing data
 
@@ -29,31 +34,6 @@ for (column in continuous_variables) {
   hist(data[,column], main = paste("Histogram of:", column), xlab = column)
 }
 
-# Checking corelations.
-# Point biserial correlations.
-binary_variables = names(data)[!names(data) %in% continuous_variables]
-for (bin_var in binary_variables) {
-    for (con_var in continuous_variables) {
-      print(paste("Corelation between", bin_var, "and", con_var, ":", biserial.cor(data[,con_var], data[,bin_var], use = c("all.obs"), level = 2)))
-    }
-    print("--------------")
-}
-
-# Correlations between variables are weak. Highest correlation equals to 0.452,
-# on average correlations are around 0.3.
-
-correlatinos <- round(cor(data[,continuous_variables]),2)
-library(reshape2)
-cors_melt <- melt(correlatinos)
-library(ggplot2)
-ggplot(data = cors_melt, aes(x=Var1, y=Var2, fill=value)) + 
-  geom_tile() + scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-  midpoint = 0, limit = c(-1,1), space = "Lab", 
-  name="Pearson\nCorrelation")
-
-# Correlations between continuous variables and price are quite weak at around 0.3-0.5.
-
-
 # Split data into train and test sets.
 set.seed(123)
 train_index = sample(c(1:length(data[,"price"])), length(data[,"price"]) * 0.7)
@@ -61,11 +41,20 @@ test_index = setdiff(c(1:length(data[,"price"])), train_index)
 
 data_train = data[train_index,]
 price_train = data_train$price
-data_train$price = NULL
 
 data_test = data[test_index,]
 price_test = data_test$price
 data_test$price = NULL
+
+# Correlations
+correlatinos <- round(cor(data_train[,continuous_variables]),2)
+cors_melt <- melt(correlatinos)
+
+ggplot(data = cors_melt, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() + scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1,1), space = "Lab", name="Correlation values") +
+  labs(x = "", y = "", title = "Correlations Heatmap")
+
+data_train$price = NULL
 
 # Standarization 
 for (column in continuous_variables[continuous_variables != "price"]) {
@@ -91,7 +80,7 @@ calculate_rmse = function(predictions, true_anwsers) {
 predictions_train = predict(model, data_train)
 predictions_test = predict(model, data_test)
 
-print(paste("Rmse train:", calculate_rmse(predictions_train, log1p(price_train))))
+print(paste("Rmse train:", calculate_rmse(predictions_train, price.log)))
 print(paste("Rmse test:", calculate_rmse(predictions_test, log1p(price_test))))
 
 residuals <- price.log - predictions_train
@@ -104,11 +93,7 @@ qqline(residuals, col = "red", lwd = 2)
 dwtest(model)
 bptest(model)
 
-# As warning "prediction from a rank-deficient fit may be misleading" suggest,
-# since furnishingstatus_unfurnished variable doesn't contribute in any way to model, 
-# so this variable will be dropped. Bedrooms variable will be dropped as well because
-# it isn't statistically important in model.
-
+# Removing "furnishingstatus_unfurnished" variable
 data_train$furnishingstatus_unfurnished = NULL
 data_test$furnishingstatus_unfurnished = NULL
 data_train$bedrooms = NULL
@@ -126,6 +111,7 @@ print(paste("Rmse test:", calculate_rmse(predictions_test, log1p(price_test))))
 residuals <- price.log - predictions_train
 hist(residuals)
 shapiro.test(residuals)
+
 qqnorm(residuals)
 qqline(residuals, col = "red", lwd = 2)
 
@@ -133,10 +119,16 @@ plot(model)
 dwtest(model)
 bptest(model)
 
-# In this case R-squared equals 0.7038 which means that relation between 
-# price and variables explains 70.38% of variation in price.
+# Residuals histogram
+residuals_mean <- mean(residuals)
+ggplot(plot.data, aes(x=residuals)) + 
+  geom_histogram(aes(y = ..density..), color="black", fill = "blue", bins = 40) +
+  geom_vline(xintercept = residuals_mean, color = "red", size = 1) +
+  geom_density(color = "green", size = 1.3) + 
+  labs(x = "Residuals", y = "Density", title = "Histogram of residuals")
 
-# Shapiro-Wilk test p-value equals 0.05117 implying that residuals distribution
-# is not significantly different from normal distribution.
-
-# 
+# Predicted vs Residuals plot
+plot.data <- data.frame(residuals, predictions_train)
+ggplot(plot.data, aes(x=predictions_train, y=residuals)) + geom_point(color="blue") +
+  geom_hline(yintercept = 0, color="black") + labs(x = "Predicted values", y = "Residuals", title = "Predicted vs Residuals")+
+  geom_smooth(color = "red")

@@ -26,7 +26,7 @@ The price variable was additionally transformed using $ln(1+x)$ function to make
 
 Before creating the model correlations between continuous were calculated. 
 
- ![alt](https://github.com/mmadajski/images/blob/main/correlations.png?raw=true)
+ ![alt](https://github.com/mmadajski/House-price-prediction/blob/main/Images/correlations.png?raw=true)
 
 As we can see from the correlation heatmap, there wasn't any significant correlation. No multicollinearity was detected.
 
@@ -41,7 +41,7 @@ Then a linear regression model was fitted to the previously prepared data. All v
 The p-value of the Shapiro-Wilk test is 0.051, implying that the distribution of the residuals is not significantly different from the normal distribution.
 The Histogram of residuals 
 
-![alt](https://github.com/mmadajski/images/blob/main/normality.png?raw=true)
+![alt](https://github.com/mmadajski/House-price-prediction/blob/main/Images/Residuals_Hist.png?raw=true)
 
 ### Autocorrelation
 
@@ -52,7 +52,7 @@ The p-value of the Durbin-Watson test is 0.697, which indicates no autocorrelati
 The p-value of the studentized Breusch-Pagan test is 0.0039, implying that the homoskedasticity not is present.
 We can also see that on a predicted vs fittet values plot where no trend can be seen. 
 
-![alt](https://github.com/mmadajski/images/blob/main/fit.png)
+![alt](https://github.com/mmadajski/House-price-prediction/blob/main/Images/Pred_vs_Fit.png?raw=true)
 
 # Summary 
 

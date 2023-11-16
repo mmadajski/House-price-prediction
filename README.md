@@ -4,7 +4,7 @@ a linear regression model was created, then it was checked whether the model mee
 
 *Technologies used*: R, ggplot2, lmtest.
 
-Project was based on Housing Price Prediction data from the Kaggle platform: https://www.kaggle.com/datasets/harishkumardatalab/housing-price-prediction
+Project was based on Housing Price Prediction data from the Kaggle platform: [Kaggle](https://www.kaggle.com/datasets/harishkumardatalab/housing-price-prediction).
  
 ## Table of contents
 * [Data preperation](#data-preperation)
